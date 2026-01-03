@@ -1,0 +1,7 @@
+/home/scattershot/Documents/Memory allocator/actualmemmansim/build/CMakeFiles/memsim.dir
+/home/scattershot/Documents/Memory allocator/actualmemmansim/build/CMakeFiles/edit_cache.dir
+/home/scattershot/Documents/Memory allocator/actualmemmansim/build/CMakeFiles/rebuild_cache.dir
+/home/scattershot/Documents/Memory allocator/actualmemmansim/build/CMakeFiles/list_install_components.dir
+/home/scattershot/Documents/Memory allocator/actualmemmansim/build/CMakeFiles/install.dir
+/home/scattershot/Documents/Memory allocator/actualmemmansim/build/CMakeFiles/install/local.dir
+/home/scattershot/Documents/Memory allocator/actualmemmansim/build/CMakeFiles/install/strip.dir

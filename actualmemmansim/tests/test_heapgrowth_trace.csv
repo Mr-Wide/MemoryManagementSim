@@ -1,0 +1,22 @@
+# Heap growth + fragmentation test
+# heap range: [0x10000000, 0x10001000) → 4096 bytes
+
+0,1,PROC_START,0x10000000,0x10001000
+
+# Allocate three blocks
+1,1,MALLOC,100
+2,1,MALLOC,200
+3,1,MALLOC,300
+
+# Free the middle block (creates a hole)
+4,1,FREE,0x10000068
+
+# Allocate a smaller block into the hole (fragmentation)
+5,1,MALLOC,50
+
+# Access some heap memory (lazy allocation check)
+6,1,ACCESS,0x10000000,R
+7,1,ACCESS,0x10000068,R
+
+# Exit
+20,1,PROC_EXIT

@@ -1,0 +1,153 @@
+#include <bits/stdc++.h>
+#include "sim/event.h"       // header you will create from previous file's commented header
+using namespace std;
+
+namespace sim {
+
+// Utility: trim whitespace
+static inline string trim(const string &s) {
+    size_t a = 0;
+    while (a < s.size() && isspace((unsigned char)s[a])) ++a;
+    size_t b = s.size();
+    while (b > a && isspace((unsigned char)s[b-1])) --b;
+    return s.substr(a, b - a);
+}
+
+// Simple CSV split (no quoted fields). Good for our simple trace format.
+static vector<string> split_csv_line(const string &line) {
+    vector<string> out;
+    string cur;
+    for (char c : line) {
+        if (c == ',') {
+            out.push_back(trim(cur));
+            cur.clear();
+        } else {
+            cur.push_back(c);
+        }
+    }
+    out.push_back(trim(cur));
+    return out;
+}
+
+// Map event name -> priority (lower number => higher priority)
+static int event_priority_for_name(const string &ename) {
+    static unordered_map<string,int> map = {
+        {"PAGEIN_COMPLETE", 0},
+        {"IO_COMPLETE",     0},
+        {"WAKEUP",          1},
+        {"TIMER",           2},
+        {"ACCESS",          3},
+        {"MALLOC",          4},
+        {"FREE",            4},
+        {"PROC_START",      4},
+        {"PROC_EXIT",       4},
+        {"SLEEP",           4},
+        {"IO_START",        4}
+    };
+    auto it = map.find(ename);
+    if (it != map.end()) return it->second;
+    return 5;
+}
+
+// Parse an integer that may be decimal or hex ("0x..." or "0X...")
+static bool parse_u64(const string &s, uint64_t &out) {
+    string t = trim(s);
+    if (t.empty()) return false;
+    try {
+        if (t.size() > 2 && (t[0] == '0') && (t[1] == 'x' || t[1] == 'X')) {
+            out = stoull(t, nullptr, 16);
+        } else {
+            out = stoull(t, nullptr, 10);
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// Workload implementation
+Workload::Workload(const string &path) : path_(path) {}
+
+bool Workload::parse_into(EventQueue &q) {
+    ifstream ifs(path_);
+    if (!ifs) {
+        cerr << "Workload::parse_into: failed to open " << path_ << "\n";
+        return false;
+    }
+
+    string line;
+    size_t lineno = 0;
+    uint64_t inserted = 0;
+    while (std::getline(ifs, line)) {
+        ++lineno;
+        string raw = line;
+        // strip comments beginning with '#'
+        auto comm = line.find('#');
+        if (comm != string::npos) line = line.substr(0, comm);
+        if (trim(line).empty()) continue;
+
+        auto toks = split_csv_line(line);
+        if (toks.size() < 3) {
+            cerr << "Workload: skipping malformed line " << lineno << ": '" << raw << "'\n";
+            continue;
+        }
+
+        // fields: timestamp, pid, EVENT, [args...]
+        uint64_t ts = 0;
+        if (!parse_u64(toks[0], ts)) {
+            cerr << "Workload: invalid timestamp at line " << lineno << ": '" << toks[0] << "'\n";
+            continue;
+        }
+
+        uint32_t pid = 0;
+        try {
+            pid = static_cast<uint32_t>(stoul(toks[1], nullptr, 10));
+        } catch (...) {
+            cerr << "Workload: invalid pid at line " << lineno << ": '" << toks[1] << "'\n";
+            continue;
+        }
+
+        string evname = toks[2];
+        vector<string> args;
+        for (size_t i = 3; i < toks.size(); ++i) args.push_back(toks[i]);
+
+        int pri = event_priority_for_name(evname);
+
+        // push into queue; EventQueue will assign seq internally
+        q.push(ts, pri, pid, evname, args, raw);
+        ++inserted;
+    }
+
+    cout << "Workload: parsed " << inserted << " events from " << path_ << "\n";
+    return true;
+}
+
+} // namespace sim
+
+// ----------------- optional self-test -----------------
+#ifdef WORKLOAD_SELFTEST
+int main(int argc, char **argv) {
+    if (argc < 2) {
+        cerr << "Usage: workload_selftest <trace.csv>\n";
+        return 1;
+    }
+    sim::EventQueue q;
+    sim::Workload wl(argv[1]);
+    if (!wl.parse_into(q)) {
+        cerr << "parse failed\n";
+        return 2;
+    }
+    // pop and print
+    while (!q.empty()) {
+        auto e = q.pop();
+        cout << "[t=" << e.key.time << "] pid=" << e.key.pid << " type=" << e.type
+             << " args=";
+        if (e.args.empty()) cout << "(none)";
+        else {
+            for (size_t i=0;i<e.args.size();++i){ if (i) cout<<","; cout<<e.args[i]; }
+        }
+        cout << " // raw: " << e.raw_line << "\n";
+    }
+    return 0;
+}
+#endif
