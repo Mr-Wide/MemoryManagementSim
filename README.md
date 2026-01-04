@@ -1,5 +1,5 @@
 clone the repo and enter the actualmemmansim folder, then execute these commands.
-rm -rf build
+// include rm -rf build for rebuilding
 mkdir build
 cd build
 cmake ..
@@ -12,3 +12,10 @@ Before I explain about this project, Id like to dedicate this poem to ChatGPT
 > Frames aligned, faults resolved, understanding grew.
 > Through patient guidance, the system made sense,
 > This simulator stands because you helped me through
+
+you can make a couple of your own tests to see for edge cases,
+I have kept a couple of test cases so you can review the performance on your device.
+
+
+also if you want to change the algorithm type in the project files, allocator.* are the files to alter.
+trace driver is in main, changes are not encouraged.
