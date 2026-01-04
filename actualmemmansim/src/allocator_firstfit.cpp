@@ -10,7 +10,7 @@ namespace sim {
 uint64_t HeapAllocator::align_up(uint64_t n) noexcept {
     return (n + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
 }
-
+// using first fit, can easily be changed into worst fit and best fit, but a lil harder to change into slab or buddy
 // ----------- Constructor -----------
 
 HeapAllocator::HeapAllocator(uint64_t heap_base, uint64_t heap_size)
@@ -92,7 +92,6 @@ void HeapAllocator::free(uint64_t addr) {
     // ----------- Coalescing -----------
 
     auto curr = free_blocks_.find(blk.start);
-
     // Coalesce with previous block
     if (curr != free_blocks_.begin()) {
         auto prev = std::prev(curr);
@@ -112,9 +111,11 @@ void HeapAllocator::free(uint64_t addr) {
         }
     }
 }
+// code is heavily unoptimized, there are instances where different features of c++ could be used, but this is a really basic C to C++ translation, cuz I got tired of writing C code
+// Forgot to mention most of the code is AI generated, but hey It works well.
 
 // ----------- Metrics -----------
-
+// Internal Frag calculates frag inside VMA (like gaps inbetween heap and stack, such things) and is independent of page or other fragmentations.
 uint64_t HeapAllocator::total_heap_size() const noexcept {
     return heap_size_;
 }
