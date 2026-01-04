@@ -1,5 +1,4 @@
 #include "sim/TLB.h"
-
 #include <deque>
 #include <algorithm>
 
@@ -8,7 +7,7 @@ namespace sim {
 /*
  * FIFO TLB implementation
  *
- * Internal model:
+ * In the header file:
  *  - deque<TLBEntry> entries_
  *  - front() = oldest
  *  - back()  = newest
@@ -16,8 +15,6 @@ namespace sim {
 
 class TLBImpl {
 public:
-    
-
     explicit TLBImpl(size_t cap)
         : capacity(cap), hits(0), misses(0) {}
 
@@ -33,7 +30,7 @@ public:
     }
 
     void insert(uint32_t pid, uint64_t vpn, int frame_id) {
-        // If entry already exists, update it (no FIFO reorder)
+        // If entry already exists, update it
         for (auto &e : entries) {
             if (e.pid == pid && e.vpn == vpn) {
                 e.frame_id = frame_id;
@@ -125,3 +122,4 @@ double TLB::hit_rate() const noexcept {
 }
 
 } // namespace sim
+// this thing is frying me man
