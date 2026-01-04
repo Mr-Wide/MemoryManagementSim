@@ -1,7 +1,8 @@
 #include "sim/physicalmem.h"
 
 #include <stdexcept>
-
+// u da real frame
+// LRU to find unused frames, which can be removed from the table. 
 namespace sim {
 
 PhysicalMemory::PhysicalMemory(size_t num_frames)
