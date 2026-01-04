@@ -1,5 +1,6 @@
 #include "sim/clock.h"
 #include <sstream>
+// clock is the one of the three pillars in the simulation files.
 
 namespace sim {
 
