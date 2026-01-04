@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 
     size_t page_faults = 0;
 
-    std::cout << "\nStarting simulation (Milestone D — allocator + fragmentation)\n\n";
+    std::cout << "\nStarting simulation\n\n";
 
     // ---------------- Event loop ----------------
     while (!eq.empty()) {
