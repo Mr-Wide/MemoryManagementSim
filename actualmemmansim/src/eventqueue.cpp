@@ -1,6 +1,7 @@
 #include "sim/event.h"
 #include <stdexcept>
-
+// even though its labeled event queue, its all just trace driven, not event driven, we parse the traces through the parser(workload)
+// then the events get into the event queue via their prioritized sequence.
 namespace sim {
 
 bool EventCompare::operator()(const Event &a, const Event &b) const {
