@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 project(memsim VERSION 0.1 LANGUAGES CXX)
 
 # User-tweakable options
-option(BUILD_SELFTESTS "Build small self-test executables for individual modules" OFF)
+# if your thing not working, you can turn the self-tests on
+option(BUILD_SELFTESTS "Build self-test executables for individual modules" OFF)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type (Debug/Release)" FORCE)
 endif()
@@ -12,7 +13,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Basic warnings (non-fatal)
 if(MSVC)
   add_compile_options(/W4 /permissive-)
 else()
@@ -23,7 +23,7 @@ endif()
 set(MEMSIM_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories(${MEMSIM_INCLUDE_DIR})
 
-# Source files for milestone A
+# Source files
 set(MEMSIM_SOURCES
     src/clock.cpp
     src/eventqueue.cpp
@@ -51,7 +51,7 @@ set_target_properties(memsim PROPERTIES
 # Optional self-tests (each compiles only the module that contains a SELFTEST guard)
 if(BUILD_SELFTESTS)
     message(STATUS "Building module self-tests (CLOCK_SELFTEST, EVENTQUEUE_SELFTEST, WORKLOAD_SELFTEST)")
-    add_executable(clock_test src/Clock.cpp)
+    add_executable(clock_test src/clock.cpp)
     target_compile_definitions(clock_test PRIVATE CLOCK_SELFTEST)
     target_include_directories(clock_test PRIVATE ${MEMSIM_INCLUDE_DIR})
 
