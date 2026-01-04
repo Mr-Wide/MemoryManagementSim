@@ -1,7 +1,7 @@
 #include "sim/metrics.h"
 
 #include <algorithm>
-
+// calculates the metrics.
 namespace sim {
 
 Metrics::Metrics() {
