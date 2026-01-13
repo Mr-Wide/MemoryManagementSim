@@ -33,7 +33,7 @@ set(MEMSIM_SOURCES
     src/MMU.cpp
     src/main.cpp
     src/scheduler.cpp
-    src/allocator_firstfit.cpp
+    src/allocator_firstfit_op.cpp
     src/metrics.cpp
     src/TLB.cpp
 )
