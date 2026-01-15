@@ -1,4 +1,4 @@
-# ---------------- Process 1 ----------------
+# ================= Process 1 =================
 0,1,PROC_START,0x10000000,0x10005000   # 20 KB heap
 
 # Allocate blocks of varying sizes
@@ -7,11 +7,11 @@
 3,1,MALLOC,512
 4,1,MALLOC,4096
 
-# Free alternating blocks to create external fragmentation
-5,1,FREE,0x10000000
-6,1,FREE,0x10001000
+# Free blocks dynamically (simulator will pick last allocated)
+5,1,FREE
+6,1,FREE
 
-# Access memory (simulate page hits and faults)
+# Access memory to trigger page faults and hits
 7,1,ACCESS,0x10002000
 8,1,ACCESS,0x10003000
 
@@ -19,21 +19,21 @@
 9,1,MALLOC,2048
 10,1,MALLOC,1024
 
-# ---------------- Process 2 ----------------
-11,2,PROC_START,0x20000000,0x20003000  # 12 KB heap
-12,2,MALLOC,4096
-13,2,MALLOC,2048
-14,2,FREE,0x20000000
+# Free remaining blocks
+11,1,FREE
+12,1,FREE
+13,1,FREE
+14,1,FREE
 
-# Access memory to trigger page-in
-15,2,ACCESS,0x20001000
-16,2,ACCESS,0x20002000
+# Process exit
+15,1,PROC_EXIT
 
-# ---------------- More frees to test coalescing ----------------
-17,1,FREE,0x10002000
-18,1,FREE,0x10003000
-19,1,FREE,0x10004000
-
-# ---------------- Processes exit ----------------
-20,1,PROC_EXIT
-21,2,PROC_EXIT
+# ================= Process 2 =================
+16,2,PROC_START,0x20000000,0x20003000  # 12 KB heap
+17,2,MALLOC,4096
+18,2,MALLOC,2048
+19,2,FREE
+20,2,ACCESS,0x20001000
+21,2,ACCESS,0x20002000
+22,2,FREE
+23,2,PROC_EXIT
