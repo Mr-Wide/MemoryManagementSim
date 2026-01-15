@@ -1,4 +1,4 @@
-#include "terminal_ui.h"
+#include "TUI.h"
 #include <iostream>
 
 namespace sim {
