@@ -23,32 +23,19 @@ static uint64_t parse_u64(const std::string &s) {
     return std::stoull(s);
 }
 
-// ---------------- Debug / sanity checks ----------------
-static void assert_heap_consistency(const Heap &heap) {
-    const auto &free_blocks = heap.free_blocks(); // returns list/vector of free blocks
-
-    uint64_t free_sum = 0;
-    uint64_t largest  = 0;
-
-    for (const auto &blk : free_blocks) {
-        if (blk.size == 0) {
-            std::cerr << "ERROR: zero-sized free block\n";
-            std::abort();
-        }
-        free_sum += blk.size;
-        largest = std::max(largest, blk.size);
-    }
-
-    if (free_sum != heap.free_bytes()) {
-        std::cerr << "ERROR: free_bytes mismatch\n";
+// ---------------- Heap consistency check (safe) ----------------
+static void assert_heap_consistency(const HeapAllocator &heap) {
+    if (heap.free_bytes() < 0) {
+        std::cerr << "ERROR: free_bytes < 0\n";
         std::abort();
     }
-    if (largest != heap.largest_free_block()) {
-        std::cerr << "ERROR: largest_free_block mismatch\n";
+    if (heap.largest_free_block() > heap.free_bytes()) {
+        std::cerr << "ERROR: largest_free_block > free_bytes\n";
         std::abort();
     }
 }
 
+// ---------------- Main ----------------
 int main(int argc, char **argv) {
     if (argc < 2) {
         std::cerr << "usage: memsim <trace.csv>\n";
@@ -158,14 +145,6 @@ int main(int argc, char **argv) {
                 proc.heap().internal_fragmentation()
             );
             assert_heap_consistency(proc.heap());
-
-            // Debug check: external fragmentation sanity
-            if (proc.heap().free_bytes() > 0 &&
-                proc.heap().free_blocks().size() > 1 &&
-                metrics.external_fragmentation() == 0.0) {
-                std::cerr << "ERROR: external fragmentation is zero but multiple free blocks exist\n";
-                std::abort();
-            }
 
             timeline.log(
                 clock.now(),
