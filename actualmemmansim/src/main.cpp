@@ -9,7 +9,7 @@
 #include "sim/scheduler.h"
 #include "sim/metrics.h"
 #include "sim/timeline.h"
-#include "sim/TUI.h"
+#include "sim/terminal_ui.h"
 
 using namespace sim;
 
