@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 #include "sim/clock.h"
 #include "sim/event.h"
@@ -13,12 +14,39 @@
 
 using namespace sim;
 
+// ---------------- Helper ----------------
 static uint64_t parse_u64(const std::string &s) {
     if (s.size() > 2 && s[0] == '0' &&
         (s[1] == 'x' || s[1] == 'X')) {
         return std::stoull(s, nullptr, 16);
     }
     return std::stoull(s);
+}
+
+// ---------------- Debug / sanity checks ----------------
+static void assert_heap_consistency(const Heap &heap) {
+    const auto &free_blocks = heap.free_blocks(); // returns list/vector of free blocks
+
+    uint64_t free_sum = 0;
+    uint64_t largest  = 0;
+
+    for (const auto &blk : free_blocks) {
+        if (blk.size == 0) {
+            std::cerr << "ERROR: zero-sized free block\n";
+            std::abort();
+        }
+        free_sum += blk.size;
+        largest = std::max(largest, blk.size);
+    }
+
+    if (free_sum != heap.free_bytes()) {
+        std::cerr << "ERROR: free_bytes mismatch\n";
+        std::abort();
+    }
+    if (largest != heap.largest_free_block()) {
+        std::cerr << "ERROR: largest_free_block mismatch\n";
+        std::abort();
+    }
 }
 
 int main(int argc, char **argv) {
@@ -57,6 +85,7 @@ int main(int argc, char **argv) {
 
         uint32_t pid = ev.key.pid;
 
+        // ---------- PROCESS START ----------
         if (ev.type == "PROC_START") {
             uint64_t base = parse_u64(ev.args[0]);
             uint64_t top  = parse_u64(ev.args[1]);
@@ -66,38 +95,77 @@ int main(int argc, char **argv) {
 
             timeline.log(clock.now(), pid, "PROC_START");
         }
+
+        // ---------- PROCESS EXIT ----------
         else if (ev.type == "PROC_EXIT") {
+            auto &proc = mmu.process(pid);
+
+            // Sanity check before exit
+            if (proc.heap().free_bytes() != proc.heap().total_heap_size() ||
+                proc.heap().largest_free_block() != proc.heap().total_heap_size()) {
+                std::cerr << "ERROR: heap not fully freed or coalesced on PROC_EXIT\n";
+                std::abort();
+            }
+
             mmu.unregister_process(pid);
             sched.terminate_process(pid);
 
             timeline.log(clock.now(), pid, "PROC_EXIT");
         }
+
+        // ---------- MALLOC ----------
         else if (ev.type == "MALLOC") {
             auto &proc = mmu.process(pid);
             uint64_t size = parse_u64(ev.args[0]);
 
             auto addr = proc.heap_alloc(size);
-            if (addr) {
-                timeline.log(
-                    clock.now(),
-                    pid,
-                    "MALLOC size=" + std::to_string(size) +
-                    " addr=0x" + std::to_string(*addr)
-                );
-
-                metrics.update_heap(
-                    proc.heap().total_heap_size(),
-                    proc.heap().allocated_bytes(),
-                    proc.heap().free_bytes(),
-                    proc.heap().largest_free_block(),
-                    proc.heap().internal_fragmentation()
-                );
+            if (!addr) {
+                std::cerr << "MALLOC failed pid=" << pid << "\n";
+                continue;
             }
+
+            // Update metrics & assert heap consistency
+            metrics.update_heap(
+                proc.heap().total_heap_size(),
+                proc.heap().allocated_bytes(),
+                proc.heap().free_bytes(),
+                proc.heap().largest_free_block(),
+                proc.heap().internal_fragmentation()
+            );
+            assert_heap_consistency(proc.heap());
+
+            // Timeline log
+            timeline.log(
+                clock.now(),
+                pid,
+                "MALLOC size=" + std::to_string(size) +
+                " addr=0x" + std::to_string(*addr)
+            );
         }
+
+        // ---------- FREE ----------
         else if (ev.type == "FREE") {
             auto &proc = mmu.process(pid);
             uint64_t addr = parse_u64(ev.args[0]);
             proc.heap_free(addr);
+
+            // Update metrics & assert heap consistency AFTER free
+            metrics.update_heap(
+                proc.heap().total_heap_size(),
+                proc.heap().allocated_bytes(),
+                proc.heap().free_bytes(),
+                proc.heap().largest_free_block(),
+                proc.heap().internal_fragmentation()
+            );
+            assert_heap_consistency(proc.heap());
+
+            // Debug check: external fragmentation sanity
+            if (proc.heap().free_bytes() > 0 &&
+                proc.heap().free_blocks().size() > 1 &&
+                metrics.external_fragmentation() == 0.0) {
+                std::cerr << "ERROR: external fragmentation is zero but multiple free blocks exist\n";
+                std::abort();
+            }
 
             timeline.log(
                 clock.now(),
@@ -105,6 +173,8 @@ int main(int argc, char **argv) {
                 "FREE addr=0x" + std::to_string(addr)
             );
         }
+
+        // ---------- ACCESS ----------
         else if (ev.type == "ACCESS") {
             auto running = sched.schedule_next();
             if (!running) continue;
@@ -119,11 +189,8 @@ int main(int argc, char **argv) {
                 sched.block_current();
 
                 uint64_t vpn = mmu.vpn_from_vaddr(vaddr);
-                timeline.log(
-                    clock.now(),
-                    *running,
-                    "PAGE_FAULT vpn=" + std::to_string(vpn) + " → BLOCKED"
-                );
+                timeline.log(clock.now(), *running,
+                             "PAGE_FAULT vpn=" + std::to_string(vpn) + " → BLOCKED");
 
                 eq.push(clock.now() + PAGEIN_LATENCY,
                         0,
@@ -132,18 +199,18 @@ int main(int argc, char **argv) {
                         { std::to_string(vpn) });
             }
         }
+
+        // ---------- PAGEIN COMPLETE ----------
         else if (ev.type == "PAGEIN_COMPLETE") {
             uint64_t vpn = std::stoull(ev.args[0]);
             mmu.complete_pagein(pid, vpn, clock.now());
             sched.wake_process(pid);
 
-            timeline.log(
-                clock.now(),
-                pid,
-                "PAGEIN_COMPLETE vpn=" + std::to_string(vpn) + " → READY"
-            );
+            timeline.log(clock.now(), pid,
+                         "PAGEIN_COMPLETE vpn=" + std::to_string(vpn) + " → READY");
         }
 
+        // ---------- SNAPSHOT METRICS ----------
         timeline.snapshot(
             clock.now(),
             metrics.allocated_bytes(),
