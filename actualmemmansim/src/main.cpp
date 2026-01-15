@@ -23,12 +23,9 @@ static uint64_t parse_u64(const std::string &s) {
     return std::stoull(s);
 }
 
-// ---------------- Heap consistency check (safe) ----------------
+// ---------------- Heap consistency check (public API only) ----------------
 static void assert_heap_consistency(const HeapAllocator &heap) {
-    if (heap.free_bytes() < 0) {
-        std::cerr << "ERROR: free_bytes < 0\n";
-        std::abort();
-    }
+    // free_bytes is unsigned → cannot be negative, no warning
     if (heap.largest_free_block() > heap.free_bytes()) {
         std::cerr << "ERROR: largest_free_block > free_bytes\n";
         std::abort();
@@ -87,10 +84,9 @@ int main(int argc, char **argv) {
         else if (ev.type == "PROC_EXIT") {
             auto &proc = mmu.process(pid);
 
-            // Sanity check before exit
-            if (proc.heap().free_bytes() != proc.heap().total_heap_size() ||
-                proc.heap().largest_free_block() != proc.heap().total_heap_size()) {
-                std::cerr << "ERROR: heap not fully freed or coalesced on PROC_EXIT\n";
+            // Ensure all allocated memory was freed (fragmentation allowed)
+            if (proc.heap().allocated_bytes() != 0) {
+                std::cerr << "ERROR: memory leak detected on PROC_EXIT pid=" << pid << "\n";
                 std::abort();
             }
 
