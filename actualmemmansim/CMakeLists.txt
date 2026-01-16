@@ -75,4 +75,26 @@ message(STATUS "  Include dir: ${MEMSIM_INCLUDE_DIR}")
 message(STATUS "  Build type : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Self-tests : ${BUILD_SELFTESTS}")
 
+# ---- GUI executable ----
+
+add_subdirectory(external/imgui)
+
+add_executable(memsim_gui
+    src/gui_main.cpp
+    src/timeline.cpp
+    src/metrics.cpp
+)
+
+target_include_directories(memsim_gui PRIVATE
+    ${MEMSIM_INCLUDE_DIR}
+    external/imgui
+    external/imgui/backends
+)
+
+target_link_libraries(memsim_gui
+    imgui
+    glfw
+    OpenGL::GL
+)
+
 # End of CMakeLists.txt
