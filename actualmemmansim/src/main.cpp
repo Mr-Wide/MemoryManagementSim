@@ -10,9 +10,11 @@
 #include "sim/metrics.h"
 #include "sim/timeline.h"
 #include "sim/TUI.h"
+#include "sim/allocator.h"
 
 using namespace sim;
 
+// Helper to parse numbers (hex or decimal)
 static uint64_t parse_u64(const std::string &s) {
     if (s.size() > 2 && s[0] == '0' &&
         (s[1] == 'x' || s[1] == 'X')) {
@@ -25,6 +27,22 @@ int main(int argc, char **argv) {
     if (argc < 2) {
         std::cerr << "usage: memsim <trace.csv>\n";
         return 1;
+    }
+
+    // ---------------- Choose allocation strategy ----------------
+    std::cout << "Select allocation strategy:\n";
+    std::cout << "1. First Fit\n2. Best Fit\n3. Worst Fit\n";
+    int choice;
+    std::cin >> choice;
+
+    FitStrategy strategy = FitStrategy::FirstFit;
+    switch (choice) {
+        case 1: strategy = FitStrategy::FirstFit; break;
+        case 2: strategy = FitStrategy::BestFit; break;
+        case 3: strategy = FitStrategy::WorstFit; break;
+        default:
+            std::cout << "Invalid choice, defaulting to First Fit.\n";
+            break;
     }
 
     Clock clock;
@@ -61,7 +79,8 @@ int main(int argc, char **argv) {
             uint64_t base = parse_u64(ev.args[0]);
             uint64_t top  = parse_u64(ev.args[1]);
 
-            mmu.register_process(pid, base, top - base);
+            // Pass chosen strategy here
+            mmu.register_process(pid, base, top - base, strategy);
             sched.add_process(pid);
 
             timeline.log(clock.now(), pid, "PROC_START");
@@ -78,12 +97,9 @@ int main(int argc, char **argv) {
 
             auto addr = proc.heap_alloc(size);
             if (addr) {
-                timeline.log(
-                    clock.now(),
-                    pid,
-                    "MALLOC size=" + std::to_string(size) +
-                    " addr=0x" + std::to_string(*addr)
-                );
+                timeline.log(clock.now(), pid,
+                             "MALLOC size=" + std::to_string(size) +
+                             " addr=0x" + std::to_string(*addr));
 
                 metrics.update_heap(
                     proc.heap().total_heap_size(),
@@ -99,11 +115,8 @@ int main(int argc, char **argv) {
             uint64_t addr = parse_u64(ev.args[0]);
             proc.heap_free(addr);
 
-            timeline.log(
-                clock.now(),
-                pid,
-                "FREE addr=0x" + std::to_string(addr)
-            );
+            timeline.log(clock.now(), pid,
+                         "FREE addr=0x" + std::to_string(addr));
         }
         else if (ev.type == "ACCESS") {
             auto running = sched.schedule_next();
@@ -119,11 +132,8 @@ int main(int argc, char **argv) {
                 sched.block_current();
 
                 uint64_t vpn = mmu.vpn_from_vaddr(vaddr);
-                timeline.log(
-                    clock.now(),
-                    *running,
-                    "PAGE_FAULT vpn=" + std::to_string(vpn) + " → BLOCKED"
-                );
+                timeline.log(clock.now(), *running,
+                             "PAGE_FAULT vpn=" + std::to_string(vpn) + " → BLOCKED");
 
                 eq.push(clock.now() + PAGEIN_LATENCY,
                         0,
@@ -137,11 +147,8 @@ int main(int argc, char **argv) {
             mmu.complete_pagein(pid, vpn, clock.now());
             sched.wake_process(pid);
 
-            timeline.log(
-                clock.now(),
-                pid,
-                "PAGEIN_COMPLETE vpn=" + std::to_string(vpn) + " → READY"
-            );
+            timeline.log(clock.now(), pid,
+                         "PAGEIN_COMPLETE vpn=" + std::to_string(vpn) + " → READY");
         }
 
         timeline.snapshot(
