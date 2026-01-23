@@ -16,7 +16,7 @@ void draw_timeline_window() {
     ImGui::Begin("Timeline");
 
     for (const auto &[time, snap] : timeline.all()) {
-        if (ImGui::TreeNode((void*)(intptr_t)time, "Time %llu", time)) {
+        if (ImGui::TreeNode((void*)(intptr_t)time, "Time %lu", time)) {
 
             ImGui::Text("Events:");
             for (const auto &e : snap.events) {
@@ -27,9 +27,9 @@ void draw_timeline_window() {
 
             ImGui::Separator();
             ImGui::Text("Metrics:");
-            ImGui::Text("Allocated: %llu", snap.metrics.allocated_bytes);
-            ImGui::Text("Free: %llu", snap.metrics.free_bytes);
-            ImGui::Text("Largest Free: %llu", snap.metrics.largest_free);
+            ImGui::Text("Allocated: %lu", snap.metrics.allocated_bytes);
+            ImGui::Text("Free: %lu", snap.metrics.free_bytes);
+            ImGui::Text("Largest Free: %lu", snap.metrics.largest_free);
             ImGui::Text("Internal Frag: %.2f", snap.metrics.internal_frag);
             ImGui::Text("External Frag: %.2f", snap.metrics.external_frag);
             ImGui::Text("Page Faults: %zu", snap.metrics.page_faults);
