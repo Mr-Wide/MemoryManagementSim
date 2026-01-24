@@ -19,6 +19,10 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# ---------------- Find System Dependencies (Linux/Mac) ----------------
+find_package(OpenGL REQUIRED)
+find_package(glfw3 REQUIRED)
+
 # ---------------- Include dirs ----------------
 set(MEMSIM_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories(${MEMSIM_INCLUDE_DIR})
@@ -36,65 +40,62 @@ set(MEMSIM_CORE_SOURCES
   src/metrics.cpp
   src/TLB.cpp
   src/timeline.cpp
-  src/simrunner.cpp          # ✅ ADD THIS
+  src/simrunner.cpp
 )
 
 # ---------------- Core library ----------------
 add_library(memsim_core STATIC ${MEMSIM_CORE_SOURCES})
 target_include_directories(memsim_core PUBLIC ${MEMSIM_INCLUDE_DIR})
 
-# ---------------- CLI executable ----------------
+# ---------------- CLI executable (Terminal) ----------------
 add_executable(memsim_a src/main.cpp)
 target_link_libraries(memsim_a memsim_core)
+set_target_properties(memsim_a PROPERTIES OUTPUT_NAME "memsim_a")
 
-set_target_properties(memsim_a PROPERTIES
-  OUTPUT_NAME "memsim_a"
+# ---------------- ImGui Library Setup ----------------
+# We build ImGui as a static library here to avoid subdirectory issues
+set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
+
+add_library(imgui_lib STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+
+# Include directories for ImGui and its backends
+target_include_directories(imgui_lib PUBLIC 
+    ${IMGUI_DIR} 
+    ${IMGUI_DIR}/backends
+)
+
+# ImGui needs to link against GLFW and OpenGL
+target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
+
+# ---------------- GUI Executable ----------------
+add_executable(memsim_gui src/gui_main.cpp)
+
+# Link everything together
+target_link_libraries(memsim_gui 
+    PRIVATE 
+    memsim_core    # Your simulation logic
+    imgui_lib      # The GUI library we built above
+    glfw           # Window manager
+    OpenGL::GL     # Graphics driver
 )
 
 # ---------------- Optional self-tests ----------------
 if(BUILD_SELFTESTS)
   message(STATUS "Building module self-tests")
-
+  
   add_executable(clock_test src/clock.cpp)
   target_compile_definitions(clock_test PRIVATE CLOCK_SELFTEST)
-  target_include_directories(clock_test PRIVATE ${MEMSIM_INCLUDE_DIR})
-
+  
   add_executable(eventqueue_test src/eventqueue.cpp)
   target_compile_definitions(eventqueue_test PRIVATE EVENTQUEUE_SELFTEST)
-  target_include_directories(eventqueue_test PRIVATE ${MEMSIM_INCLUDE_DIR})
-
+  
   add_executable(workload_test src/workload.cpp)
   target_compile_definitions(workload_test PRIVATE WORKLOAD_SELFTEST)
-  target_include_directories(workload_test PRIVATE ${MEMSIM_INCLUDE_DIR})
 endif()
-
-# ---------------- GUI ----------------
-add_subdirectory(external/imgui)
-
-add_executable(memsim_gui
-  src/gui_main.cpp
-)
-
-target_include_directories(memsim_gui PRIVATE
-  ${MEMSIM_INCLUDE_DIR}
-  external/imgui
-  external/imgui/backends
-)
-
-target_link_libraries(memsim_gui
-  memsim_core          # ✅ ONLY dependency on sim logic
-  imgui
-  glfw
-  OpenGL::GL
-)
-
-# ---------------- Install ----------------
-install(TARGETS memsim_a memsim_gui
-        RUNTIME DESTINATION bin)
-
-# ---------------- Summary ----------------
-message(STATUS "memsim project configured")
-message(STATUS "  Source dir : ${CMAKE_SOURCE_DIR}")
-message(STATUS "  Include dir: ${MEMSIM_INCLUDE_DIR}")
-message(STATUS "  Build type : ${CMAKE_BUILD_TYPE}")
-message(STATUS "  Self-tests : ${BUILD_SELFTESTS}")
