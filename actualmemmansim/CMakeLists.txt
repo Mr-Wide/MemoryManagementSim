@@ -36,6 +36,7 @@ set(MEMSIM_CORE_SOURCES
   src/metrics.cpp
   src/TLB.cpp
   src/timeline.cpp
+  src/simrunner.cpp          # ✅ ADD THIS
 )
 
 # ---------------- Core library ----------------
@@ -81,7 +82,7 @@ target_include_directories(memsim_gui PRIVATE
 )
 
 target_link_libraries(memsim_gui
-  memsim_core
+  memsim_core          # ✅ ONLY dependency on sim logic
   imgui
   glfw
   OpenGL::GL
