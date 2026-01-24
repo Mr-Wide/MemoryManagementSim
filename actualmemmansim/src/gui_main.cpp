@@ -1,197 +1,153 @@
-#include "sim/simrunner.h"
-#include "sim/timeline.h"
+#include <cstdio>
+#include <iostream>
+#include <vector>
 
+// 1. Include only standard headers first to test the binary
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <GLFW/glfw3.h>
 
-#include <iostream>
-#include <vector>
-#include <string>
+// 2. Include your sim headers
+#include "sim/simrunner.h"
+#include "sim/timeline.h"
 
-using namespace sim;
+// USE NO GLOBALS!
+// Everything must be inside main() or passed as arguments.
 
-// ---- GLOBAL STATE ----
-static Timeline timeline;
-static bool simulation_ran = false;
-static int fit_choice = 0;
-static char trace_path[256] = "../tests/test_fragmentation_stress.csv"; 
-
-static std::vector<uint64_t> timestamps;
-static int selected_timestamp_idx = -1;
-
-// ---- CONTROL PANEL ----
-void draw_control_panel() {
-    // FORCE POSITION: Top-Left
-    ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_Always);
-
-    ImGui::Begin("Control Panel", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-
-    ImGui::Text("Trace File:");
-    ImGui::InputText("##trace", trace_path, sizeof(trace_path));
-
-    ImGui::Text("Strategy:");
-    ImGui::RadioButton("First Fit", &fit_choice, 0); ImGui::SameLine();
-    ImGui::RadioButton("Best Fit",  &fit_choice, 1); ImGui::SameLine();
-    ImGui::RadioButton("Worst Fit", &fit_choice, 2);
-
-    ImGui::Dummy(ImVec2(0, 20));
-
-    if (ImGui::Button("RUN SIMULATION", ImVec2(380, 50))) {
-        std::cout << "[GUI] Run button pressed..." << std::endl;
-        
-        timeline.clear();
-        timestamps.clear();
-        selected_timestamp_idx = -1;
-
-        SimConfig cfg;
-        cfg.trace_file = trace_path;
-        cfg.strategy = (fit_choice == 0) ? FitStrategy::FirstFit : 
-                       (fit_choice == 1) ? FitStrategy::BestFit : FitStrategy::WorstFit;
-
-        try {
-            if (run_simulation(cfg, timeline)) {
-                simulation_ran = true;
-                for (auto const& [time, _] : timeline.all()) {
-                    timestamps.push_back(time);
-                }
-                std::cout << "[GUI] Simulation finished. Steps: " << timestamps.size() << std::endl;
-            } else {
-                std::cout << "[GUI] Simulation returned false." << std::endl;
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[GUI] Error: " << e.what() << std::endl;
-        }
-    }
-    ImGui::End();
-}
-
-// ---- TIMELINE VIEWER ----
-void draw_timeline() {
-    // FORCE POSITION: Right Side
-    ImGui::SetNextWindowPos(ImVec2(440, 20), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(800, 680), ImGuiCond_Always);
-
-    ImGui::Begin("Timeline Viewer", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-
-    if (!simulation_ran) {
-        ImGui::Text("Simulation not run yet.");
-        ImGui::End();
-        return;
-    }
-
-    // Left ListBox for Timestamps
-    ImGui::BeginChild("TimeList", ImVec2(150, 0), true);
-    for (int i = 0; i < (int)timestamps.size(); i++) {
-        char buf[32];
-        // FIX: Cast to (unsigned long long) to suppress warnings
-        sprintf(buf, "%llu", (unsigned long long)timestamps[i]);
-        if (ImGui::Selectable(buf, selected_timestamp_idx == i)) {
-            selected_timestamp_idx = i;
-        }
-    }
-    ImGui::EndChild();
-
-    ImGui::SameLine();
-
-    // Right Detail View
-    ImGui::BeginChild("Details", ImVec2(0, 0), true);
-    if (selected_timestamp_idx >= 0 && selected_timestamp_idx < (int)timestamps.size()) {
-        uint64_t t = timestamps[selected_timestamp_idx];
-        auto snap_opt = timeline.get(t);
-        
-        if (snap_opt) {
-            ImGui::TextColored(ImVec4(0,1,1,1), "Time Step: %llu", (unsigned long long)t);
-            ImGui::Separator();
-            
-            // Memory Metrics
-            ImGui::Text("Allocated: %llu bytes", (unsigned long long)snap_opt->metrics.allocated_bytes);
-            ImGui::Text("Free:      %llu bytes", (unsigned long long)snap_opt->metrics.free_bytes);
-            ImGui::Separator();
-
-            // Events
-            for (auto &e : snap_opt->events) {
-                ImGui::BulletText("[PID %u] %s", e.pid, e.message.c_str());
-            }
-        }
-    }
-    ImGui::EndChild();
-
-    ImGui::End();
-}
-
-// ---- MAIN ----
 int main() {
-    // DEBUG: Start
-    std::cout << "[DEBUG] 1. Starting main..." << std::endl;
+    // 1. Force disable output buffering (So you see text INSTANTLY)
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
 
+    printf("--- STEP 1: Program Started ---\n");
+
+    // 2. Initialize Variables LOCALLY
+    sim::Timeline timeline;
+    std::vector<uint64_t> timestamps;
+    int selected_timestamp_idx = -1;
+    bool simulation_ran = false;
+    int fit_choice = 0;
+    char trace_path[256] = "../tests/test_fragmentation_stress.csv";
+
+    printf("--- STEP 2: Variables Initialized ---\n");
+
+    // 3. Error Callback
     glfwSetErrorCallback([](int error, const char* description) {
-        std::cerr << "[GLFW ERROR] " << error << ": " << description << std::endl;
+        fprintf(stderr, "GLFW Error %d: %s\n", error, description);
     });
 
-    // DEBUG: Init GLFW
-    std::cout << "[DEBUG] 2. Initializing GLFW..." << std::endl;
+    // 4. Init GLFW
     if (!glfwInit()) {
-        std::cerr << "[FATAL] Failed to initialize GLFW!" << std::endl;
+        fprintf(stderr, "FAILED to init GLFW\n");
         return 1;
     }
+    printf("--- STEP 3: GLFW Initialized ---\n");
 
-    // DEBUG: Create Window
-    std::cout << "[DEBUG] 3. Creating Window (Legacy Profile)..." << std::endl;
-    
-    // We intentionally do NOT use Core Profile hints to ensure maximum compatibility
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Memory Simulator GUI", nullptr, nullptr);
-    if (window == nullptr) {
-        std::cerr << "[FATAL] Failed to create GLFW window!" << std::endl;
-        glfwTerminate();
+    // 5. Create Window (Legacy Mode for safety)
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "Memory Simulator", nullptr, nullptr);
+    if (!window) {
+        fprintf(stderr, "FAILED to create Window\n");
         return 1;
     }
-    
-    std::cout << "[DEBUG] 4. Context Current..." << std::endl;
+    printf("--- STEP 4: Window Created ---\n");
+
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); 
+    glfwSwapInterval(1);
 
-    // DEBUG: Init ImGui
-    std::cout << "[DEBUG] 5. Initializing ImGui..." << std::endl;
+    // 6. Init ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
-
-    // DEBUG: Init Backends
-    std::cout << "[DEBUG] 6. Initializing ImGui Backends..." << std::endl;
+    
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
 
-    std::cout << "[DEBUG] 7. Entering Main Loop..." << std::endl;
+    printf("--- STEP 5: ImGui Initialized. Entering Loop... ---\n");
 
-    // Main Loop
+    // 7. Main Loop
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
+        // Start Frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        draw_control_panel();
-        draw_timeline();
+        // ---- DRAW GUI MANUALLY HERE (No separate functions to keep it simple) ----
+        
+        // Window 1: Controls
+        ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(400, 250), ImGuiCond_Always);
+        ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoResize);
+        
+        ImGui::InputText("Trace", trace_path, sizeof(trace_path));
+        ImGui::RadioButton("First Fit", &fit_choice, 0); ImGui::SameLine();
+        ImGui::RadioButton("Best Fit",  &fit_choice, 1); ImGui::SameLine();
+        ImGui::RadioButton("Worst Fit", &fit_choice, 2);
+
+        if (ImGui::Button("RUN", ImVec2(100, 40))) {
+            printf("Button Pressed\n");
+            
+            sim::SimConfig cfg;
+            cfg.trace_file = trace_path;
+            // Map int to Enum
+            if (fit_choice == 0) cfg.strategy = sim::FitStrategy::FirstFit;
+            else if (fit_choice == 1) cfg.strategy = sim::FitStrategy::BestFit;
+            else cfg.strategy = sim::FitStrategy::WorstFit;
+
+            timeline.clear();
+            timestamps.clear();
+            
+            try {
+                if (sim::run_simulation(cfg, timeline)) {
+                    for (auto const& [t, snap] : timeline.all()) {
+                        timestamps.push_back(t);
+                    }
+                    simulation_ran = true;
+                    printf("Simulation Success: %zu steps\n", timestamps.size());
+                }
+            } catch (std::exception& e) {
+                printf("Error: %s\n", e.what());
+            }
+        }
+        ImGui::End();
+
+        // Window 2: Results
+        ImGui::SetNextWindowPos(ImVec2(440, 20), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(400, 400), ImGuiCond_Always);
+        ImGui::Begin("Results", nullptr, ImGuiWindowFlags_NoResize);
+        if (simulation_ran) {
+            ImGui::Text("Steps: %zu", timestamps.size());
+            if (!timestamps.empty()) {
+                 if (ImGui::BeginListBox("Timestamps")) {
+                    for (int i=0; i<timestamps.size(); i++) {
+                        char buf[32];
+                        sprintf(buf, "%llu", (unsigned long long)timestamps[i]);
+                        if(ImGui::Selectable(buf, selected_timestamp_idx == i)) 
+                            selected_timestamp_idx = i;
+                    }
+                    ImGui::EndListBox();
+                 }
+            }
+        } else {
+            ImGui::Text("Press Run...");
+        }
+        ImGui::End();
+        // -------------------------------------------------------------------------
 
         ImGui::Render();
-        
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-        
-        // RED BACKGROUND to verify OpenGL is drawing
-        glClearColor(0.5f, 0.0f, 0.0f, 1.0f); 
+        int w, h;
+        glfwGetFramebufferSize(window, &w, &h);
+        glViewport(0, 0, w, h);
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-        
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        
         glfwSwapBuffers(window);
     }
 
-    std::cout << "[DEBUG] 8. Cleanup..." << std::endl;
+    // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
