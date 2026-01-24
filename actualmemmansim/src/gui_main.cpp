@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <vector>
 
 using namespace sim;
 
@@ -15,6 +16,10 @@ static bool simulation_ran = false;
 static int fit_choice = 0;
 static char trace_path[256] = "trace.csv";
 
+static std::vector<uint64_t> timestamps;
+static int selected_timestamp = -1;
+
+// ---- CONTROL PANEL ----
 void draw_control_panel() {
     ImGui::Begin("Simulation Control");
 
@@ -26,6 +31,8 @@ void draw_control_panel() {
 
     if (ImGui::Button("Run Simulation")) {
         timeline.clear();
+        timestamps.clear();
+        selected_timestamp = -1;
 
         SimConfig cfg;
         cfg.trace_file = trace_path;
@@ -35,26 +42,62 @@ void draw_control_panel() {
                               FitStrategy::WorstFit;
 
         simulation_ran = run_simulation(cfg, timeline);
+
+        // Fill timestamps
+        for (auto &[time, _] : timeline.all())
+            timestamps.push_back(time);
+
+        std::cout << "Simulation finished. Available timestamps:\n";
+        for (auto t : timestamps)
+            std::cout << "  " << t << "\n";
     }
 
     ImGui::End();
 }
 
+// ---- TIMELINE PANEL ----
 void draw_timeline() {
     ImGui::Begin("Timeline");
 
-    for (auto &[time, snap] : timeline.all()) {
-        if (ImGui::TreeNode((void*)(intptr_t)time, "Time %lu", time)) {
-            for (auto &e : snap.events)
-                ImGui::BulletText("PID %u: %s",
-                                  e.pid, e.message.c_str());
-            ImGui::TreePop();
+    if (!simulation_ran) {
+        ImGui::Text("Run a simulation first.");
+        ImGui::End();
+        return;
+    }
+
+    ImGui::Text("Available timestamps:");
+
+    ImGui::BeginChild("Timestamps", ImVec2(150, 0), true);
+    for (int i = 0; i < timestamps.size(); i++) {
+        char buf[32];
+        sprintf(buf, "%lu", timestamps[i]);
+        if (ImGui::Selectable(buf, selected_timestamp == i)) {
+            selected_timestamp = i;
         }
     }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+
+    ImGui::BeginChild("Events", ImVec2(0, 0), true);
+    if (selected_timestamp >= 0 && selected_timestamp < timestamps.size()) {
+        uint64_t t = timestamps[selected_timestamp];
+        auto snap_opt = timeline.get(t); // timeline.get(time) returns optional snapshot
+        if (snap_opt) {
+            for (auto &e : snap_opt->events)
+                ImGui::BulletText("PID %u: %s", e.pid, e.message.c_str());
+        } else {
+            ImGui::Text("No events at this timestamp.");
+        }
+    } else {
+        ImGui::Text("Select a timestamp to see events.");
+    }
+    ImGui::EndChild();
 
     ImGui::End();
 }
 
+// ---- MAIN ----
 int main() {
     if (!glfwInit()) return 1;
 
@@ -77,8 +120,7 @@ int main() {
         ImGui::NewFrame();
 
         draw_control_panel();
-        if (simulation_ran)
-            draw_timeline();
+        draw_timeline();
 
         ImGui::Render();
         int w, h;
