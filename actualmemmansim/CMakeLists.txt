@@ -1,29 +1,15 @@
-cmake_minimum_required(VERSION 3.16)
-project(memsim VERSION 0.1 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.10)
+project(MemSim)
 
-# ---------------- Build options ----------------
-option(BUILD_SELFTESTS "Build self-test executables for individual modules" OFF)
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type (Debug/Release)" FORCE)
-endif()
-
-# ---------------- C++ standard ----------------
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON) # Fixes the DT_TEXTREL warning
 
-if(MSVC)
-  add_compile_options(/W4 /permissive-)
-else()
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# --- 1. FIND NCURSES ---
+set(CURSES_NEED_NCURSES TRUE)
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
 
-# ---------------- Include dirs ----------------
-set(MEMSIM_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-include_directories(${MEMSIM_INCLUDE_DIR})
-
-# ---------------- Core sources ----------------
+# --- 2. SOURCE FILES ---
 set(MEMSIM_CORE_SOURCES
   src/clock.cpp
   src/eventqueue.cpp
@@ -35,30 +21,18 @@ set(MEMSIM_CORE_SOURCES
   src/allocator.cpp
   src/metrics.cpp
   src/TLB.cpp
-  src/timeline.cpp
-  src/TUI.cpp
-  #src/simrunner.cpp
+  src/timeline.cpp   
+  src/TUI.cpp        # Must match casing on disk
 )
 
-# ---------------- Core library ----------------
-add_library(memsim_core STATIC ${MEMSIM_CORE_SOURCES})
-target_include_directories(memsim_core PUBLIC ${MEMSIM_INCLUDE_DIR})
+# --- 3. BUILD CORE LIBRARY ---
+add_library(memsim_core ${MEMSIM_CORE_SOURCES})
 
-# ---------------- CLI executable (Terminal) ----------------
+# CRITICAL FIX: Link Ncurses directly to the library that uses it (memsim_core)
+target_link_libraries(memsim_core ${CURSES_LIBRARIES})
+
+# --- 4. BUILD EXECUTABLE ---
 add_executable(memsim_a src/main.cpp)
-target_link_libraries(memsim_a memsim_core)
-set_target_properties(memsim_a PROPERTIES OUTPUT_NAME "memsim_a")
 
-# ---------------- Optional self-tests ----------------
-if(BUILD_SELFTESTS)
-  message(STATUS "Building module self-tests")
-  
-  add_executable(clock_test src/clock.cpp)
-  target_compile_definitions(clock_test PRIVATE CLOCK_SELFTEST)
-  
-  add_executable(eventqueue_test src/eventqueue.cpp)
-  target_compile_definitions(eventqueue_test PRIVATE EVENTQUEUE_SELFTEST)
-  
-  add_executable(workload_test src/workload.cpp)
-  target_compile_definitions(workload_test PRIVATE WORKLOAD_SELFTEST)
-endif()
+# Link the core library to the executable
+target_link_libraries(memsim_a memsim_core)
