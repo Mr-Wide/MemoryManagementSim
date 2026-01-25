@@ -13,7 +13,7 @@
 #include "sim/timeline.h"
 
 // 2. Include your TUI Header
-#include "sim/tui.h" 
+#include "sim/TUI.h" 
 
 using namespace sim;
 
