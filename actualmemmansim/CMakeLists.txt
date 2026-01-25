@@ -19,10 +19,6 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# ---------------- Find System Dependencies (Linux/Mac) ----------------
-find_package(OpenGL REQUIRED)
-find_package(glfw3 REQUIRED)
-
 # ---------------- Include dirs ----------------
 set(MEMSIM_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories(${MEMSIM_INCLUDE_DIR})
@@ -51,40 +47,6 @@ target_include_directories(memsim_core PUBLIC ${MEMSIM_INCLUDE_DIR})
 add_executable(memsim_a src/main.cpp)
 target_link_libraries(memsim_a memsim_core)
 set_target_properties(memsim_a PROPERTIES OUTPUT_NAME "memsim_a")
-
-# ---------------- ImGui Library Setup ----------------
-# We build ImGui as a static library here to avoid subdirectory issues
-set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
-
-add_library(imgui_lib STATIC
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
-)
-
-# Include directories for ImGui and its backends
-target_include_directories(imgui_lib PUBLIC 
-    ${IMGUI_DIR} 
-    ${IMGUI_DIR}/backends
-)
-
-# ImGui needs to link against GLFW and OpenGL
-target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
-
-# ---------------- GUI Executable ----------------
-add_executable(memsim_gui src/gui_main.cpp)
-
-# Link everything together
-target_link_libraries(memsim_gui 
-    PRIVATE 
-    memsim_core    # Your simulation logic
-    imgui_lib      # The GUI library we built above
-    glfw           # Window manager
-    OpenGL::GL     # Graphics driver
-)
 
 # ---------------- Optional self-tests ----------------
 if(BUILD_SELFTESTS)
