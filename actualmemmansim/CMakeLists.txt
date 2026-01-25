@@ -36,7 +36,7 @@ set(MEMSIM_CORE_SOURCES
   src/metrics.cpp
   src/TLB.cpp
   src/timeline.cpp
-  src/simrunner.cpp
+  #src/simrunner.cpp
 )
 
 # ---------------- Core library ----------------
