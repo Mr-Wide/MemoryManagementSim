@@ -5,7 +5,7 @@ namespace sim {
 
 class TerminalUI {
 public:
-    // Start interactive inspection of the timeline
+    // Start the Ncurses interactive visualizer
     static void run(const Timeline &timeline);
 };
 
